@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Ledger — on-chain tasks</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.13.2/ethers.umd.min.js"></script>
+<style>
+  :root {
+    --bg: #0B0F14;
+    --panel: #121820;
+    --panel-border: #1F2833;
+    --accent: #F2B705;
+    --accent-dim: #7A6108;
+    --text: #E5E9EC;
+    --muted: #6B7785;
+    --done: #3ECF8E;
+    --danger: #E2564F;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Space Grotesk', sans-serif;
+    min-height: 100vh;
+    display: flex;
+    justify-content: center;
+    padding: 48px 20px;
+  }
+  .wrap { width: 100%; max-width: 640px; }
+
+  header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 40px; gap: 16px; }
+  h1 { font-size: 28px; font-weight: 700; margin: 0 0 4px; letter-spacing: -0.02em; }
+  .sub { color: var(--muted); font-size: 14px; margin: 0; }
+  .sub span { color: var(--accent); font-family: 'JetBrains Mono', monospace; }
+
+  #connectBtn {
+    background: var(--accent);
+    color: #0B0F14;
+    border: none;
+    font-family: 'Space Grotesk', sans-serif;
+    font-weight: 600;
+    font-size: 14px;
+    padding: 10px 18px;
+    border-radius: 6px;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  #connectBtn:hover { background: #ffc93d; }
+  #connectBtn:disabled { background: var(--panel-border); color: var(--muted); cursor: default; }
+
+  .status-pill {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    color: var(--muted);
+    margin-top: 8px;
+    text-align: right;
+  }
+  .status-pill.ok { color: var(--done); }
+  .status-pill.err { color: var(--danger); }
+
+  form { display: flex; gap: 10px; margin-bottom: 36px; }
+  input[type="text"] {
+    flex: 1;
+    background: var(--panel);
+    border: 1px solid var(--panel-border);
+    color: var(--text);
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 15px;
+    padding: 14px 16px;
+    border-radius: 8px;
+    outline: none;
+  }
+  input[type="text"]:focus { border-color: var(--accent); }
+  input[type="text"]::placeholder { color: var(--muted); }
+  button[type="submit"] {
+    background: transparent;
+    border: 1px solid var(--accent);
+    color: var(--accent);
+    font-family: 'Space Grotesk', sans-serif;
+    font-weight: 600;
+    padding: 0 22px;
+    border-radius: 8px;
+    cursor: pointer;
+  }
+  button[type="submit"]:hover { background: rgba(242,183,5,0.1); }
+  button[type="submit"]:disabled { border-color: var(--panel-border); color: var(--muted); cursor: default; }
+
+  .chain { position: relative; padding-left: 8px; }
+  .task {
+    position: relative;
+    background: var(--panel);
+    border: 1px solid var(--panel-border);
+    border-radius: 10px;
+    padding: 16px 18px;
+    margin-bottom: 0;
+    display: flex;
+    align-items: flex-start;
+    gap: 14px;
+  }
+  .task + .task { margin-top: 22px; }
+  .task::before {
+    content: "";
+    position: absolute;
+    left: 32px;
+    top: -22px;
+    height: 22px;
+    width: 2px;
+    background: var(--panel-border);
+  }
+  .task:first-child::before { display: none; }
+
+  .id-tag {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--accent-dim);
+    background: rgba(242,183,5,0.08);
+    border: 1px solid rgba(242,183,5,0.25);
+    border-radius: 5px;
+    padding: 4px 7px;
+    margin-top: 2px;
+    flex-shrink: 0;
+  }
+  .task.completed .id-tag { color: var(--done); border-color: rgba(62,207,142,0.3); background: rgba(62,207,142,0.08); }
+
+  .task-body { flex: 1; min-width: 0; }
+  .task-content { font-size: 15px; line-height: 1.5; word-break: break-word; }
+  .task.completed .task-content { color: var(--muted); text-decoration: line-through; }
+  .task-meta { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--muted); margin-top: 6px; }
+
+  .task-actions { display: flex; gap: 8px; flex-shrink: 0; }
+  .icon-btn {
+    background: transparent;
+    border: 1px solid var(--panel-border);
+    color: var(--muted);
+    border-radius: 6px;
+    width: 30px;
+    height: 30px;
+    cursor: pointer;
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .icon-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .icon-btn.danger:hover { border-color: var(--danger); color: var(--danger); }
+
+  .empty {
+    text-align: center;
+    color: var(--muted);
+    font-size: 14px;
+    padding: 60px 0;
+    border: 1px dashed var(--panel-border);
+    border-radius: 10px;
+  }
+
+  footer { margin-top: 40px; text-align: center; font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--muted); }
+  footer a { color: var(--accent-dim); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1>Ledger</h1>
+      <p class="sub">Tasks written to <span>BOT Chain</span> testnet</p>
+    </div>
+    <div>
+      <button id="connectBtn">Connect wallet</button>
+      <div class="status-pill" id="statusPill"></div>
+    </div>
+  </header>
+
+  <form id="addForm">
+    <input type="text" id="taskInput" placeholder="Add a task and send it on-chain..." maxlength="280" disabled />
+    <button type="submit" id="addBtn" disabled>Add</button>
+  </form>
+
+  <div class="chain" id="taskList">
+    <div class="empty">Connect your wallet to load your on-chain tasks.</div>
+  </div>
+
+  <footer>contract: <span id="contractAddr">not yet deployed — set CONTRACT_ADDRESS below</span></footer>
+</div>
+
+<script>
+  // ---- CONFIG: fill this in after you deploy the contract ----
+  const CONTRACT_ADDRESS = "0xff95B48998CFF766ea4103095F265261EA24b1C5";
+  const BOT_TESTNET = {
+    chainId: "0x3C8", // 968 in hex
+    chainName: "BOT Chain Testnet",
+    nativeCurrency: { name: "BOT", symbol: "BOT", decimals: 18 },
+    rpcUrls: ["https://rpc.bohr.life"],
+    blockExplorerUrls: ["https://scan.bohr.life/"],
+  };
+  const ABI = [
+    "function addTask(string content) external",
+    "function completeTask(uint256 id) external",
+    "function deleteTask(uint256 id) external",
+    "function getMyTasks() external view returns (tuple(uint256 id, string content, bool completed, uint256 createdAt)[])",
+  ];
+  // --------------------------------------------------------------
+
+  const connectBtn = document.getElementById("connectBtn");
+  const statusPill = document.getElementById("statusPill");
+  const addForm = document.getElementById("addForm");
+  const taskInput = document.getElementById("taskInput");
+  const addBtn = document.getElementById("addBtn");
+  const taskList = document.getElementById("taskList");
+  document.getElementById("contractAddr").textContent =
+    CONTRACT_ADDRESS.startsWith("PASTE") ? "not yet deployed — set CONTRACT_ADDRESS in index.html" : CONTRACT_ADDRESS;
+
+  let provider, signer, contract;
+
+  function setStatus(msg, type) {
+    statusPill.textContent = msg;
+    statusPill.className = "status-pill" + (type ? " " + type : "");
+  }
+
+  async function ensureBotTestnet() {
+    const currentChainId = await window.ethereum.request({ method: "eth_chainId" });
+    if (currentChainId === BOT_TESTNET.chainId) return;
+    try {
+      await window.ethereum.request({
+        method: "wallet_switchEthereumChain",
+        params: [{ chainId: BOT_TESTNET.chainId }],
+      });
+    } catch (switchError) {
+      if (switchError.code === 4902) {
+        await window.ethereum.request({
+          method: "wallet_addEthereumChain",
+          params: [BOT_TESTNET],
+        });
+      } else {
+        throw switchError;
+      }
+    }
+  }
+
+  async function connect() {
+    if (!window.ethereum) {
+      setStatus("No wallet found — install MetaMask", "err");
+      return;
+    }
+    if (CONTRACT_ADDRESS.startsWith("PASTE")) {
+      setStatus("Set CONTRACT_ADDRESS in index.html first", "err");
+      return;
+    }
+    try {
+      connectBtn.disabled = true;
+      connectBtn.textContent = "Connecting...";
+      await window.ethereum.request({ method: "eth_requestAccounts" });
+      await ensureBotTestnet();
+
+      provider = new ethers.BrowserProvider(window.ethereum);
+      signer = await provider.getSigner();
+      contract = new ethers.Contract(CONTRACT_ADDRESS, ABI, signer);
+
+      const addr = await signer.getAddress();
+      connectBtn.textContent = addr.slice(0, 6) + "..." + addr.slice(-4);
+      setStatus("Connected to BOT Chain testnet", "ok");
+      taskInput.disabled = false;
+      addBtn.disabled = false;
+
+      await loadTasks();
+    } catch (err) {
+      console.error(err);
+      setStatus(err.message || "Connection failed", "err");
+      connectBtn.disabled = false;
+      connectBtn.textContent = "Connect wallet";
+    }
+  }
+
+  async function loadTasks() {
+    taskList.innerHTML = '<div class="empty">Loading tasks from chain...</div>';
+    try {
+      const tasks = await contract.getMyTasks();
+      if (tasks.length === 0) {
+        taskList.innerHTML = '<div class="empty">No tasks yet — add your first one above.</div>';
+        return;
+      }
+      taskList.innerHTML = "";
+      tasks.forEach((t) => {
+        if (t.content === "" && t.createdAt === 0n) return; // deleted task
+        const div = document.createElement("div");
+        div.className = "task" + (t.completed ? " completed" : "");
+        const date = new Date(Number(t.createdAt) * 1000).toLocaleString();
+        div.innerHTML = `
+          <div class="id-tag">#${t.id.toString().padStart(3, "0")}</div>
+          <div class="task-body">
+            <div class="task-content"></div>
+            <div class="task-meta">${date}</div>
+          </div>
+          <div class="task-actions">
+            ${!t.completed ? `<button class="icon-btn" data-action="complete" data-id="${t.id}" title="Mark complete">✓</button>` : ""}
+            <button class="icon-btn danger" data-action="delete" data-id="${t.id}" title="Delete">✕</button>
+          </div>
+        `;
+        div.querySelector(".task-content").textContent = t.content; // safe text insertion
+        taskList.appendChild(div);
+      });
+    } catch (err) {
+      console.error(err);
+      taskList.innerHTML = '<div class="empty">Could not load tasks. Check the console.</div>';
+    }
+  }
+
+  addForm.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const content = taskInput.value.trim();
+    if (!content) return;
+    addBtn.disabled = true;
+    addBtn.textContent = "Sending...";
+    try {
+      const tx = await contract.addTask(content);
+      setStatus("Transaction sent, waiting for confirmation...", "");
+      await tx.wait();
+      taskInput.value = "";
+      setStatus("Task added on-chain", "ok");
+      await loadTasks();
+    } catch (err) {
+      console.error(err);
+      setStatus(err.reason || err.message || "Transaction failed", "err");
+    } finally {
+      addBtn.disabled = false;
+      addBtn.textContent = "Add";
+    }
+  });
+
+  taskList.addEventListener("click", async (e) => {
+    const btn = e.target.closest(".icon-btn");
+    if (!btn) return;
+    const id = btn.dataset.id;
+    const action = btn.dataset.action;
+    btn.disabled = true;
+    try {
+      const tx = action === "complete" ? await contract.completeTask(id) : await contract.deleteTask(id);
+      setStatus("Transaction sent, waiting for confirmation...", "");
+      await tx.wait();
+      setStatus(action === "complete" ? "Task completed on-chain" : "Task deleted on-chain", "ok");
+      await loadTasks();
+    } catch (err) {
+      console.error(err);
+      setStatus(err.reason || err.message || "Transaction failed", "err");
+      btn.disabled = false;
+    }
+  });
+
+  connectBtn.addEventListener("click", connect);
+</script>
+</body>
+</html>

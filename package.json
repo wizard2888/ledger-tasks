@@ -1,0 +1,15 @@
+{
+  "name": "todo-dapp",
+  "version": "1.0.0",
+  "description": "A simple on-chain to-do list dApp for BOT Chain",
+  "scripts": {
+    "compile": "hardhat compile",
+    "deploy:testnet": "hardhat run scripts/deploy.js --network botTestnet",
+    "deploy:mainnet": "hardhat run scripts/deploy.js --network botMainnet"
+  },
+  "devDependencies": {
+    "@nomicfoundation/hardhat-toolbox": "^5.0.0",
+    "dotenv": "^16.6.1",
+    "hardhat": "^2.22.0"
+  }
+}
