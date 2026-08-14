@@ -188,14 +188,6 @@
 
 <script>
   // ---- CONFIG: fill this in after you deploy the contract ----
-  // const CONTRACT_ADDRESS = "0xff95B48998CFF766ea4103095F265261EA24b1C5";
-  // const BOT_TESTNET = {
-  //   chainId: "0x3C8", // 968 in hex
-  //   chainName: "BOT Chain Testnet",
-  //   nativeCurrency: { name: "BOT", symbol: "BOT", decimals: 18 },
-  //   rpcUrls: ["https://rpc.bohr.life"],
-  //   blockExplorerUrls: ["https://scan.bohr.life/"],
-  // };
   const CONTRACT_ADDRESS = "0xff95B48998CFF766ea4103095F265261EA24b1C5";
   const BOT_MAINNET = {
     chainId: "0x2A5", // 677 in hex
@@ -228,7 +220,7 @@
     statusPill.className = "status-pill" + (type ? " " + type : "");
   }
 
-  async function ensureBotTestnet() {
+  async function ensureBotMainnet() {
     const currentChainId = await window.ethereum.request({ method: "eth_chainId" });
     if (currentChainId === BOT_MAINNET.chainId) return;
     try {
@@ -261,7 +253,7 @@
       connectBtn.disabled = true;
       connectBtn.textContent = "Connecting...";
       await window.ethereum.request({ method: "eth_requestAccounts" });
-      await ensureBotTestnet();
+      await ensureBotMainnet();
 
       provider = new ethers.BrowserProvider(window.ethereum);
       signer = await provider.getSigner();
@@ -269,7 +261,7 @@
 
       const addr = await signer.getAddress();
       connectBtn.textContent = addr.slice(0, 6) + "..." + addr.slice(-4);
-      setStatus("Connected to BOT Chain testnet", "ok");
+      setStatus("Connected to BOT Chain", "ok");
       taskInput.disabled = false;
       addBtn.disabled = false;
 
