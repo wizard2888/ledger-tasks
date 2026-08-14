@@ -51,6 +51,19 @@
   }
   #connectBtn:hover { background: #ffc93d; }
   #connectBtn:disabled { background: var(--panel-border); color: var(--muted); cursor: default; }
+  #disconnectBtn {
+    background: transparent;
+    border: 1px solid var(--panel-border);
+    color: var(--muted);
+    font-family: 'Space Grotesk', sans-serif;
+    font-weight: 600;
+    font-size: 13px;
+    padding: 10px 16px;
+    border-radius: 6px;
+    cursor: pointer;
+    margin-left: 8px;
+  }
+  #disconnectBtn:hover { border-color: var(--danger); color: var(--danger); }
 
   .status-pill {
     font-family: 'JetBrains Mono', monospace;
@@ -170,6 +183,7 @@
     </div>
     <div>
       <button id="connectBtn">Connect wallet</button>
+      <button id="disconnectBtn" style="display:none;">Disconnect</button>
       <div class="status-pill" id="statusPill"></div>
     </div>
   </header>
@@ -205,6 +219,7 @@
   // --------------------------------------------------------------
 
   const connectBtn = document.getElementById("connectBtn");
+  const disconnectBtn = document.getElementById("disconnectBtn");
   const statusPill = document.getElementById("statusPill");
   const addForm = document.getElementById("addForm");
   const taskInput = document.getElementById("taskInput");
@@ -264,6 +279,7 @@
       setStatus("Connected to BOT Chain", "ok");
       taskInput.disabled = false;
       addBtn.disabled = false;
+      disconnectBtn.style.display = "inline-block";
 
       await loadTasks();
     } catch (err) {
@@ -272,6 +288,37 @@
       connectBtn.disabled = false;
       connectBtn.textContent = "Connect wallet";
     }
+  }
+
+  async function disconnect() {
+    // MetaMask has no true "disconnect" for injected providers - the site just
+    // forgets its session. Where the wallet_revokePermissions RPC is supported,
+    // also ask it to revoke this site's account access.
+    try {
+      if (window.ethereum && window.ethereum.request) {
+        await window.ethereum.request({
+          method: "wallet_revokePermissions",
+          params: [{ eth_accounts: {} }],
+        });
+      }
+    } catch (err) {
+      // Not all wallets/versions support this - safe to ignore and fall through
+      // to clearing local state below.
+      console.warn("wallet_revokePermissions not supported, clearing local session only:", err.message);
+    }
+
+    provider = null;
+    signer = null;
+    contract = null;
+
+    connectBtn.disabled = false;
+    connectBtn.textContent = "Connect wallet";
+    disconnectBtn.style.display = "none";
+    taskInput.disabled = true;
+    addBtn.disabled = true;
+    taskInput.value = "";
+    taskList.innerHTML = '<div class="empty">Connect your wallet to load your on-chain tasks.</div>';
+    setStatus("Disconnected", "");
   }
 
   async function loadTasks() {
@@ -350,6 +397,7 @@
   });
 
   connectBtn.addEventListener("click", connect);
+  disconnectBtn.addEventListener("click", disconnect);
 </script>
 </body>
 </html>
